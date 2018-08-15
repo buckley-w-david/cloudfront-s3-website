@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters: 
+  BucketNameParameter: 
+    Type: String
+Resources: 
+  WebsiteBucket: 
+    Properties: 
+      BucketName: !Ref BucketNameParameter
+      WebsiteConfiguration: 
+        IndexDocument: index.html
+    Type: "AWS::S3::Bucket"
+  WebsiteBucketDistribution: 
+    DependsOn: 
+      - WebsiteBucket
+    Properties: 
+      DistributionConfig: 
+        DefaultCacheBehavior: 
+          ForwardedValues: 
+            QueryString: true
+          TargetOriginId: bucket-origin-id
+          ViewerProtocolPolicy: allow-all
+        Enabled: true
+        Origins: 
+          - CustomOriginConfig: 
+              OriginProtocolPolicy: http-only
+            DomainName: !Select [1, !Split ["http://", !GetAtt WebsiteBucket.WebsiteURL]]
+            Id: bucket-origin-id
+    Type: "AWS::CloudFront::Distribution"
+  WebsiteBucketPolicy: 
+    DependsOn: 
+      - WebsiteBucket
+    Properties: 
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument: 
+        Statement: 
+          - Action: "s3:GetObject"
+            Effect: Allow
+            Principal: 
+              AWS: "*"
+            Resource: 
+              "Fn::Sub": 
+                - "${arn}/*"
+                - arn: !GetAtt WebsiteBucket.Arn
+            Sid: PublicReadForGetBucketObjects
+        Version: 2008-10-17
+    Type: "AWS::S3::BucketPolicy"
